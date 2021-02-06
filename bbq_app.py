@@ -1,6 +1,6 @@
 import pygatt
-import csv
 import datetime
+import requests
 
 # Connect to the device
 connect_key = bytearray.fromhex("2107060504030201b8220000000000") # Update this with correct connection key you obtained in part 2
@@ -19,15 +19,17 @@ def handle_notification(handle, value):
     handle -- integer, characteristic read handle the data was received on
     value -- bytearray, the data returned in the notification
     """
-    temps = {"timestamp": str(datetime.datetime.now())}
+    temps = {"mac":bbq_mac, "timestamp": str(datetime.datetime.now())}
     for i in range(0,8,2):
         celcius = int(int.from_bytes(value[i:i+2], "little") / 10)
         f_degrees = fahrenheit(celcius)
-        temps[f"Probe-{int(i/2)+1}"] = f_degrees
-    print(temps)
-    with open("temperature_log.csv", "a") as csv_file:
-        writer = csv.writer(csv_file)
-        writer.writerow([temps[field] for field in temps])
+        temps[f"probe_{int(i/2)+1}"] = f_degrees
+    try:
+        r = requests.post('http://127.0.0.1:5000/smart_thermo', json=temps)
+        print(r.status_code)
+    except:
+        pass
+
 
 
 try:
@@ -47,9 +49,6 @@ try:
     device.char_write_handle(0x0034, enable_notifications)
     print("Connected with the device.")
 
-    with open('temperature_log.csv', 'w') as csv_file:
-        writer = csv.writer(csv_file)
-        writer.writerow(["Timestamp", "Probe 1", "Probe 2", "Probe 3", "Probe 4"])
     # Subscribe and listen for notifications of the realtime data
     try:
         device.subscribe("0000fff4-0000-1000-8000-00805f9b34fb", callback=handle_notification)
